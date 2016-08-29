@@ -48,7 +48,7 @@
     "WebServerGroup" : {
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
-        "AvailabilityZones" : "us-east-1a, us-east-1b",
+        "AvailabilityZones" : ["us-east-1a", "us-east-1c", "us-east-1d"],
         "LaunchConfigurationName" : { "Ref" : "LaunchConfig" },
         "MinSize" : "3",
         "MaxSize" : "9",
