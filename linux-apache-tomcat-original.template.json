@@ -1,7 +1,7 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
 
-  "Description" : "Create a load balanced, auto-scaled sample web site with Tomcat7 and OpenJDK 1.7 across two availability zones in AWS US East. The auto scaling trigger is based on the CPU utilization of the web servers. The instances are configured behind a load balancer with a simple health check. The group scales up by three instances (to a maximum of nine total instances) when CPU load on one instance surpasses 50%. The group scales down by once instance when CPU load falls below 20%. The web site is available on port 80 of the load balancer, however, the instances each listen on port 8080. Instances are accessible from the internet via SSH on port 22.",
+  "Description" : "Create a load balanced, auto-scaled sample web site with Tomcat7 and OpenJDK 1.7 across two availability zones in AWS US East. The auto scaling trigger is based on the CPU utilization of the web servers. The instances are configured behind a load balancer with a simple health check. The group scales up by three instances (to a maximum of nine total instances) when CPU load on one instance surpasses 50%. The group scales down by once instance when CPU load falls below 20%. The web site is available on port 80 of the load balancer, however, the instances each listen on port 8080. Instances are accessible from the internet via SSH on port 22. Tomcat and the JDK are installed from UserData (and not baked into the AMI). ",
 
   "Parameters" : {
     "InstanceType" : {
