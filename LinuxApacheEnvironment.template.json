@@ -1,20 +1,25 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
 
-  "Description" : "Create a load balanced, auto-scaled sample web site with Tomcat7 and OpenJDK 1.7 across two availability zones in AWS US East. The auto scaling trigger is based on the CPU utilization of the web servers. The instances are configured behind a load balancer with a simple health check. The group scales up by three instances (to a maximum of nine total instances) when CPU load on one instance surpasses 50%. The group scales down by once instance when CPU load falls below 20%. The web site is available on port 80 of the load balancer, however, the instances each listen on port 8080. Instances are accessible from the internet via SSH on port 22. Tomcat and the JDK are installed from UserData (and not baked into the AMI). ",
+  "Description" : "Create a load balanced, auto-scaled sample web site with Apache, Tomcat7 and OpenJDK 1.7 across two availability zones in AWS US East. The auto scaling trigger is based on the CPU utilization of the app and web servers. The web instances are configured behind a public-facing load balancer with a health check on /index.html. The app servers are configured behind an internal load balancer with a health check on 8080:/index.jsp. The group scales up by three instances (to a maximum of nine total instances) when CPU load on one instance surpasses 50%. The group scales down by once instance when CPU load falls below 20%. The static web site is available on port 80 of the load balancer. The web tier proxies port 81 to the app server instances, which listen on port 8080. Instances are accessible from the internet via SSH on port 22. Tomcat and the JDK are installed from UserData (and not baked into the AMI). ",
 
   "Parameters" : {
     "InstanceType" : {
-      "Description" : "Type of EC2 instance to launch (default is m4.large, 2x8)",
+      "Description" : "Type of EC2 instance to launch",
       "Type" : "String",
-      "Default" : "m4.large"
+      "Default" : "m1.small"
     },
-    "WebServerPort" : {
+    "AppServerPort" : {
       "Description" : "The TCP port for the Web Server",
       "Type" : "String",
       "Default" : "8080"
     },
-    "KeyName" : {
+    "WebServerPort" : {
+      "Description" : "The TCP port for the Web Server",
+      "Type" : "String",
+      "Default" : "80"
+    },
+      "KeyName" : {
       "Description" : "The EC2 Key Pair to allow SSH access to the instances",
       "Type" : "String",
       "Default" : "dixonaws"
@@ -45,18 +50,81 @@
   },
 
   "Resources" : {
-    "AppServerGroup" : {
+    "WebServerGroup" : {
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
       "Properties" : {
         "AvailabilityZones" : ["us-east-1a", "us-east-1c", "us-east-1d"],
-        "LaunchConfigurationName" : { "Ref" : "LaunchConfig" },
-        "MinSize" : "3",
-        "MaxSize" : "9",
-        "LoadBalancerNames" : [ { "Ref" : "ElasticLoadBalancer" } ]
+        "LaunchConfigurationName" : { "Ref" : "WebServerLaunchConfig" },
+        "MinSize" : "2",
+        "MaxSize" : "4",
+        "LoadBalancerNames" : [ { "Ref" : "elb0" } ]
       }
    },
 
-    "LaunchConfig" : {
+    "WebServerLaunchConfig" : {
+      "Type" : "AWS::AutoScaling::LaunchConfiguration",
+      "Properties" : {
+        "KeyName" : { "Ref" : "KeyName" },
+        "ImageId" : "ami-7c807d14",
+        
+        "UserData" : { "Fn::Base64" : { "Fn::Join" : ["",[
+            "#!/bin/bash","\n",          
+
+			"# install apache 2.4 from the AWS repo","\n",
+			"# John Dixon, 8-29-2016","\n",
+			"# tested with m1.small instance size","\n",
+
+			"# update packages","\n",
+			"yum -y update","\n",
+			
+			"# install tomcat7 and default webapps in /usr/share/tomcat7","\n",
+			"yum -y install httpd24","\n",
+
+			"# set the daemon to start automatically","\n",
+			"chkconfig --level 345 httpd on","\n",
+
+			"# start the daemon now","\n",
+			"apachectl restart","\n",
+            			
+              "\"\"\n" 
+        ]]}},
+        
+        "SecurityGroups" : [ { "Ref" : "InstanceSecurityGroup" } ],
+        "InstanceType" : "m1.small"
+      }
+    },
+
+    "WebServerScaleUpPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "WebServerGroup" },
+        "Cooldown" : "60",
+        "ScalingAdjustment" : "1"
+      }
+    },
+    "WebServerScaleDownPolicy" : {
+      "Type" : "AWS::AutoScaling::ScalingPolicy",
+      "Properties" : {
+        "AdjustmentType" : "ChangeInCapacity",
+        "AutoScalingGroupName" : { "Ref" : "WebServerGroup" },
+        "Cooldown" : "60",
+        "ScalingAdjustment" : "-1"
+      }
+    },
+      
+  "AppServerGroup" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "AvailabilityZones" : ["us-east-1a", "us-east-1c", "us-east-1d"],
+        "LaunchConfigurationName" : { "Ref" : "AppServerLaunchConfig" },
+        "MinSize" : "3",
+        "MaxSize" : "9",
+        "LoadBalancerNames" : [ { "Ref" : "elb1" } ]
+      }
+   },
+
+    "AppServerLaunchConfig" : {
       "Type" : "AWS::AutoScaling::LaunchConfiguration",
       "Properties" : {
         "KeyName" : { "Ref" : "KeyName" },
@@ -125,7 +193,7 @@
         "Period": "300",
         "EvaluationPeriods": "2",
         "Threshold": "50",
-        "AlarmActions": [ { "Ref": "AppServerScaleUpPolicy" } ],
+        "AlarmActions": [ { "Ref": "WebServerScaleUpPolicy" } ],
         "Dimensions": [
           {
             "Name": "AutoScalingGroupName",
@@ -146,7 +214,7 @@
         "Period": "300",
         "EvaluationPeriods": "2",
         "Threshold": "20",
-        "AlarmActions": [ { "Ref": "AppServerScaleDownPolicy" } ],
+        "AlarmActions": [ { "Ref": "WebServerScaleDownPolicy" } ],
         "Dimensions": [
           {
             "Name": "AutoScalingGroupName",
@@ -157,7 +225,7 @@
       }
     },
 
-    "ElasticLoadBalancer" : {
+    "elb0" : {
       "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
       "Properties" : {
         "AvailabilityZones" : { "Fn::GetAZs" : "" },
@@ -167,7 +235,26 @@
           "Protocol" : "HTTP"
         } ],
         "HealthCheck" : {
-          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "WebServerPort" }, "/"]]},
+          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "AppServerPort" }, "/"]]},
+          "HealthyThreshold" : "3",
+          "UnhealthyThreshold" : "5",
+          "Interval" : "30",
+          "Timeout" : "5"
+        }
+      }
+    },
+      
+    "elb1" : {
+      "Type" : "AWS::ElasticLoadBalancing::LoadBalancer",
+      "Properties" : {
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
+        "Listeners" : [ {
+          "LoadBalancerPort" : "81",
+          "InstancePort" : { "Ref" : "AppServerPort" },
+          "Protocol" : "HTTP"
+        } ],
+        "HealthCheck" : {
+          "Target" : { "Fn::Join" : [ "", ["HTTP:", { "Ref" : "AppServerPort" }, "/"]]},
           "HealthyThreshold" : "3",
           "UnhealthyThreshold" : "5",
           "Interval" : "30",
@@ -185,22 +272,44 @@
           "FromPort" : "22",
           "ToPort" : "22",
           "CidrIp" : "0.0.0.0/0"
-        },
-        {
-          "IpProtocol" : "tcp",
-          "FromPort" : { "Ref" : "WebServerPort" },
-          "ToPort" : { "Ref" : "WebServerPort" },
-          "SourceSecurityGroupOwnerId" : {"Fn::GetAtt" : ["ElasticLoadBalancer", "SourceSecurityGroup.OwnerAlias"]},
-          "SourceSecurityGroupName" : {"Fn::GetAtt" : ["ElasticLoadBalancer", "SourceSecurityGroup.GroupName"]}
-        } ]
+        }]
+        
       }
-    }
+    },
+    
+    "AppServerSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable HTTP 8080 access from elb1",
+        "SecurityGroupIngress" : [ {
+          "IpProtocol" : "tcp",
+          "FromPort" : "8080",
+          "ToPort" : "8080",
+          "CidrIp" : "0.0.0.0/0"
+        }]
+        
+      }
+    },
+    
+    "WebServerSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable HTTP 80 and 81 access from the internet",
+        "SecurityGroupIngress" : [ {
+          "IpProtocol" : "tcp",
+          "FromPort" : "80",
+          "ToPort" : "81",
+          "CidrIp" : "0.0.0.0/0"
+        }]
+        
+      }
+    }      
   },
 
   "Outputs" : {
     "URL" : {
-      "Description" : "The URL of the website",
-      "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "ElasticLoadBalancer", "DNSName" ]}]]}
+      "Description" : "The URL of the public-facing web sever load balancer",
+      "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "elb0", "DNSName" ]}]]}
     }
   }
 }

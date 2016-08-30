@@ -5,9 +5,9 @@
 
   "Parameters" : {
     "InstanceType" : {
-      "Description" : "Type of EC2 instance to launch (default is m4.large, 2x8)",
+      "Description" : "Type of EC2 instance to launch",
       "Type" : "String",
-      "Default" : "m4.large"
+      "Default" : "m1.small"
     },
     "WebServerPort" : {
       "Description" : "The TCP port for the Web Server",
@@ -96,7 +96,7 @@
       }
     },
 
-    "AppServerScaleUpPolicy" : {
+    "WebServerScaleUpPolicy" : {
       "Type" : "AWS::AutoScaling::ScalingPolicy",
       "Properties" : {
         "AdjustmentType" : "ChangeInCapacity",
@@ -105,7 +105,7 @@
         "ScalingAdjustment" : "3"
       }
     },
-    "AppServerScaleDownPolicy" : {
+    "WebServerScaleDownPolicy" : {
       "Type" : "AWS::AutoScaling::ScalingPolicy",
       "Properties" : {
         "AdjustmentType" : "ChangeInCapacity",
@@ -125,7 +125,7 @@
         "Period": "300",
         "EvaluationPeriods": "2",
         "Threshold": "50",
-        "AlarmActions": [ { "Ref": "AppServerScaleUpPolicy" } ],
+        "AlarmActions": [ { "Ref": "WebServerScaleUpPolicy" } ],
         "Dimensions": [
           {
             "Name": "AutoScalingGroupName",
@@ -146,7 +146,7 @@
         "Period": "300",
         "EvaluationPeriods": "2",
         "Threshold": "20",
-        "AlarmActions": [ { "Ref": "AppServerScaleDownPolicy" } ],
+        "AlarmActions": [ { "Ref": "WebServerScaleDownPolicy" } ],
         "Dimensions": [
           {
             "Name": "AutoScalingGroupName",

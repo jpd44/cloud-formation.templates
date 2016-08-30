@@ -1,0 +1,15 @@
+Listen 80
+Listen 81
+
+<VirtualHost *:81>
+        ProxyRequests Off
+        ProxyPreserveHost On
+
+        <Proxy *>
+                Order deny,allow
+                Allow from all
+        </Proxy>
+
+        ProxyPass / http://172.31.21.99:8080/
+        ProxyPassReverse / http://172.31.21.99:8080/
+</VirtualHost>
