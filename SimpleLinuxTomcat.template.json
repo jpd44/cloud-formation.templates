@@ -199,7 +199,7 @@
 
   "Outputs" : {
     "URL" : {
-      "Description" : "The URL of the website",
+      "Description" : "The URL of the load balancer",
       "Value" :  { "Fn::Join" : [ "", [ "http://", { "Fn::GetAtt" : [ "ElasticLoadBalancer", "DNSName" ]}]]}
     }
   }
